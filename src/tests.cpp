@@ -7,7 +7,12 @@ int my_strlen(char *str) {
      */
 
     // IMPLEMENT YOUR CODE HERE
-    return 0;
+    int len = 0;
+    while (str[len] != '\0') {
+        len++;
+    }
+    return len;
+    
 }
 
 
@@ -19,8 +24,19 @@ void my_strcat(char *str_1, char *str_2) {
      */
 
     // IMPLEMENT YOUR CODE HERE
-}
+    int i = 0;
+    while (str_1[i] != '\0') {
+        i++;
+    }
+    int j = 0;
+    while (str_2[j] != '\0') {
+        str_1[i] = str_2[j];
+        i++;
+        j++;
 
+        str_1[i] = '\0'; // 添加结束符
+}
+}
 
 // 练习3，实现库函数strstr
 char* my_strstr(char *s, char *p) {
@@ -31,8 +47,23 @@ char* my_strstr(char *s, char *p) {
      */
 
     // IMPLEMENT YOUR CODE HERE
-    return 0;
+    
+    if (p[0] == '\0') return s;  
+
+    for (int i = 0; s[i] != '\0'; ++i) {
+        int k = 0;
+        while (s[i + k] != '\0' && p[k] != '\0' && s[i + k] == p[k]) {
+            ++k;
+        }
+        if (p[k] == '\0') {      
+            return &s[i];
+        }
+    }
+    return 0; 
 }
+
+    
+
 
 
 /**
@@ -97,6 +128,13 @@ void rgb2gray(float *in, float *out, int h, int w) {
 
     // IMPLEMENT YOUR CODE HERE
     // ...
+    int size = h * w;
+    for (int i = 0; i < size; i++){
+        float R = in[3*i];
+        float G = in[3*i + 1];
+        float B = in[3*i + 2];
+        out[i] = 0.2989 * R + 0.5870 * G + 0.1140 * B;
+    }
 }
 
 // 练习5，实现图像处理算法 resize：缩小或放大图像
@@ -198,9 +236,30 @@ void resize(float *in, float *out, int h, int w, int c, float scale) {
 
     int new_h = h * scale, new_w = w * scale;
     // IMPLEMENT YOUR CODE HERE
-
+    for (int y = 0; y < new_h ; y++) {
+        for (int x = 0; x < new_w ; x++){
+            float x0 = x / scale;
+            float y0 = y / scale;
+            int x1 = static_cast<int>(x0);
+            int y1 = static_cast<int>(y0);
+            int x2 = x1 + 1;
+            int y2 = y1 + 1;
+            if (x2 >= w) x2 = w - 1;
+            if (y2 >= h) y2 = h - 1;
+            float dx = x0 - x1;
+            float dy = y0 - y1;
+            for (int channel = 0; channel < c; channel++){
+                float P1 = in[(y1 * w + x1) * c + channel];
+                float P2 = in[(y1 * w + x2) * c + channel];
+                float P3 = in[(y2 * w + x1) * c + channel];
+                float P4 = in[(y2 * w + x2) * c + channel];
+                out[(y * new_w + x) * c + channel] = P1 * (1 - dx) * (1 - dy) + P2 * dx * (1 - dy)
+                                                  + P3 * (1 - dx) * dy + P4 * dx * dy;
+        }
+    }
+ 
 }
-
+}
 
 // 练习6，实现图像处理算法：直方图均衡化
 void hist_eq(float *in, int h, int w) {
@@ -221,4 +280,54 @@ void hist_eq(float *in, int h, int w) {
      */
 
     // IMPLEMENT YOUR CODE HERE
+    int N = h * w;
+int hist[256] = {0};
+
+
+for (int i = 0; i < N; ++i) {
+    in[i] /= 255.0f;
+    int v = static_cast<int>(in[i] * 255.0f);
+    if (v < 0) v = 0;        //防御性编程
+    if (v > 255) v = 255;
+    hist[v]++;   
+}
+// 2) 计算累计直方图 CDF，并做归一化
+float cdf[256];
+cdf[0] = static_cast<float>(hist[0]);
+for (int i = 1; i < 256; ++i) {
+    cdf[i] = cdf[i - 1] + hist[i];  // 前缀和
+}
+
+// 归一化到 [0,1]
+for (int i = 0; i < 256; ++i) {
+    cdf[i] /= static_cast<float>(N);
+}
+// 3) 找到第一个非零的 cdf_min（避免纯黑或纯背景导致异常）
+float cdf_min = 0.0f;
+for (int i = 0; i < 256; ++i) {
+    if (cdf[i] > 0.0f) {
+        cdf_min = cdf[i];
+        break;
+    }
+}
+
+// 4) 构建查找表 LUT，用于把原灰度值映射成新灰度值
+unsigned char LUT[256];
+for (int i = 0; i < 256; ++i) {
+    float t = (cdf[i] - cdf_min) / (1.0f - cdf_min); // 归一化到 [0,1]
+    if (t < 0.0f) t = 0.0f;
+    if (t > 1.0f) t = 1.0f;
+    LUT[i] = static_cast<unsigned char>(t * 255.0f + 0.5f); // 转成整数灰度
+}
+// 5) 用查表法更新每个像素（就地修改）
+for (int i = 0; i < N; ++i) {
+    int v = static_cast<int>(in[i] * 255.0f);  // 原灰度（0~255）
+    if (v < 0) v = 0;
+    if (v > 255) v = 255;
+    // 查表替换，并归一化回 [0,1]
+    in[i] = static_cast<float>(LUT[v]) / 255.0f;
+}
+    for (int i = 0; i < h*w; ++i) {
+    in[i] *= 255.0f;   // 若项目接下来期望 0~1，就不要乘回
+}
 }
